@@ -1,5 +1,9 @@
 # UnityInitializeProject
-Initialize project automatically with script launched from https://github.com/unitycoder/UnityLauncherPro
+Initialize project automatically
+
+## Usage
+- Use with UnityLauncherPro https://github.com/unitycoder/UnityLauncherPro/wiki/Initialize-Project-Script
+- Or, copy the [script](https://github.com/unitycoder/UnityInitializeProject/blob/main/Assets/Editor/InitializeProject.cs) into Editor/ folder and run from Tools/UnityLibrary/Initialize Project
 
 When starting a new project, you always have to do the same things over and over again.. not anymore!
 
