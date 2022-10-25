@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.PackageManager.UI;
 using UnityEditor.SceneManagement;
@@ -77,6 +78,29 @@ namespace UnityLauncherProTools
             // TODO setup light settings
             // TODO adjust mainscene: camera pos, skybox off?
             Camera.main.transform.position = Vector3.zero;
+
+            // disable editor camera easing and acceleration
+            SceneView.lastActiveSceneView.cameraSettings.easingEnabled = false;
+            SceneView.lastActiveSceneView.cameraSettings.accelerationEnabled = false;
+
+            // GizmoUtility in 2022.1
+            //GizmoUtility.SetGizmoEnabled(GizmoType.Move, true);
+
+            // set sceneview gizmos size https://github.com/unity3d-kr/GizmoHotkeys/blob/05516ebfc3ce1655cbefb150d328e2b66e03646d/Editor/SelectionGizmo.cs
+            Assembly asm = Assembly.GetAssembly(typeof(Editor));
+            Type type = asm.GetType("UnityEditor.AnnotationUtility");
+            if (type != null)
+            {
+                PropertyInfo iconSizeProperty = type.GetProperty("iconSize", BindingFlags.Static | BindingFlags.NonPublic);
+                if (iconSizeProperty != null)
+                {
+                    //float nowIconSize = (float)iconSizeProperty.GetValue(asm, null);
+                    iconSizeProperty.SetValue(asm, 0.01f, null);
+                }
+            }
+
+            // disable unity splash
+            PlayerSettings.SplashScreen.show = false;
 
             // TODO adjust quality settings (but only in mobile? add toggle: webgl/mobile/windows)
 
