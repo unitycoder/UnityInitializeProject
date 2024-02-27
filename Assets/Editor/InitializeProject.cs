@@ -12,6 +12,8 @@ namespace UnityLauncherProTools
 {
     public class InitializeProject : EditorWindow
     {
+        static readonly string id = "InitializeProject_";
+
         // settings
         static string[] folders = new string[] { "Fonts", "Materials", "Models", "Plugins", "Prefabs", "Scenes", "Scripts", "Shaders", "Sounds", "Textures" };
 
@@ -22,9 +24,12 @@ namespace UnityLauncherProTools
         static string assetsFolder;
         static bool deleteFile = true;
 
-        // settings
         static bool createFolders = true;
         static bool updatePackages = true;
+
+        static bool importAssets = true;
+        static List<string> items;
+        static List<bool> checkedStates;
 
         [MenuItem("Tools/UnityLibrary/Initialize Project")]
         public static void InitManually()
@@ -38,6 +43,9 @@ namespace UnityLauncherProTools
         public static void Init()
         {
             window = (InitializeProject)EditorWindow.GetWindow(typeof(InitializeProject));
+            window.titleContent = new GUIContent("Initialize Project");
+            window.minSize = new Vector2(450, 550);
+            LoadSettings();
             window.Show();
         }
 
@@ -47,13 +55,107 @@ namespace UnityLauncherProTools
             GUILayout.Space(10);
 
             Checkbox("Create Folders", ref createFolders);
-            Checkbox("updatePackages", ref updatePackages);
+            Checkbox("Update Packages", ref updatePackages);
+            Checkbox("Import Assets", ref importAssets);
 
             GUILayout.Space(10);
-            if (GUILayout.Button("Setup Project", GUILayout.Height(64))) SetupProject();
+            if (GUILayout.Button("Setup Project", GUILayout.Height(64)))
+            {
+                SetupProject();
+            }
+
+            DrawAddAssets();
+            DrawAssetList();
 
             // enter to confirm
             if (Event.current.keyCode == KeyCode.Return) SetupProject();
+        }
+
+        static void DrawAssetList()
+        {
+            GUILayout.Space(5);
+            GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(2));
+            GUILayout.Space(5);
+
+            // Draw list of items
+            for (int i = 0; i < items.Count; i++)
+            {
+                GUILayout.BeginHorizontal();
+
+                bool newState = EditorGUILayout.Toggle(checkedStates[i], GUILayout.Width(20));
+                if (newState != checkedStates[i])
+                {
+                    checkedStates[i] = newState;
+                }
+
+                var filename = Path.GetFileName(items[i]);
+                GUILayout.Label(filename, GUILayout.Width(350));
+
+                EditorGUI.BeginDisabledGroup(i == 0);
+                if (GUILayout.Button("^", GUILayout.Width(20)))
+                {
+                    var item = items[i];
+                    var state = checkedStates[i];
+                    items.RemoveAt(i);
+                    checkedStates.RemoveAt(i);
+                    items.Insert(i - 1, item);
+                    checkedStates.Insert(i - 1, state);
+                }
+                EditorGUI.EndDisabledGroup();
+
+                EditorGUI.BeginDisabledGroup(i == items.Count - 1);
+                if (GUILayout.Button("v", GUILayout.Width(20)))
+                {
+                    var item = items[i];
+                    var state = checkedStates[i];
+                    items.RemoveAt(i);
+                    checkedStates.RemoveAt(i);
+                    items.Insert(i + 1, item);
+                    checkedStates.Insert(i + 1, state);
+                }
+                EditorGUI.EndDisabledGroup();
+
+                if (GUILayout.Button("x", GUILayout.Width(20)))
+                {
+                    items.RemoveAt(i);
+                    checkedStates.RemoveAt(i);
+                }
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        private static void DrawAddAssets()
+        {
+            GUILayout.Space(10);
+            GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(2));
+
+            if (GUILayout.Button("Select assets..."))
+            {
+                // TODO add support for custom asset store folder (2022 and later)
+                var assetsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Unity\\Asset Store-5.x");
+                if (Directory.Exists(assetsFolder) == true)
+                {
+                    string path = EditorUtility.OpenFilePanel("Select Asset to Include", assetsFolder, "unitypackage");
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        // dont add if already in list
+                        if (items.Contains(path) == false)
+                        {
+                            items.Add(path);
+                            checkedStates.Add(true);
+                        }
+                        else
+                        {
+                            var filename = Path.GetFileName(path);
+                            Debug.LogWarning(filename + " is already added.");
+                        }
+                    }
+                }
+                else
+                {
+                    Debug.LogError("Asset folder not found: " + assetsFolder);
+                }
+            }
         }
 
         static void SetupProject()
@@ -84,6 +186,8 @@ namespace UnityLauncherProTools
             // TODO 2d/3d mode for editor?
 
             UpdatePackages();
+
+            SaveSettings(import: true);
 
             // skybox off from lighting settings
             RenderSettings.skybox = null;
@@ -142,6 +246,78 @@ namespace UnityLauncherProTools
             AssetDatabase.Refresh();
         }
 
+        private void OnEnable()
+        {
+            LoadSettings();
+        }
+
+        private void OnDestroy()
+        {
+            SaveSettings();
+        }
+
+        private void OnDisable()
+        {
+            SaveSettings();
+        }
+
+        private static void LoadSettings()
+        {
+            items = new List<string>();
+            checkedStates = new List<bool>();
+
+            importAssets = EditorPrefs.GetBool(id + "importAssets", true);
+            var listOfAssets = EditorPrefs.GetString(id + "listOfAssets", "");
+            var checkedState = EditorPrefs.GetString(id + "checkedState", "");
+
+            if (listOfAssets != "")
+            {
+                var assets = listOfAssets.Split('|');
+                foreach (var asset in assets)
+                {
+                    if (asset != "")
+                    {
+                        items.Add(asset);
+                    }
+                }
+
+                var states = checkedState.Split('|');
+                foreach (var state in states)
+                {
+                    if (state != "")
+                    {
+                        checkedStates.Add(state == "1");
+                    }
+                }
+            }
+        }
+
+        static void SaveSettings(bool import = false)
+        {
+            string listOfAssets = "";
+            string checkedState = "";
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (checkedStates[i] == true)
+                {
+                    if (import == true)
+                    {
+                        if (File.Exists(items[i]) == false)
+                        {
+                            Debug.LogError("File not found: " + items[i]);
+                            continue;
+                        }
+                        Debug.Log("Importing: " + items[i]);
+                        AssetDatabase.ImportPackage(items[i], false);
+                    }
+                }
+                listOfAssets += items[i] + "|";
+                checkedState += (checkedStates[i] == true ? 1 : 0) + "|";
+            }
+            EditorPrefs.SetString(id + "listOfAssets", listOfAssets);
+            EditorPrefs.SetString(id + "checkedState", checkedState);
+            EditorPrefs.SetBool(id + "importAssets", importAssets);
+        }
 
         static void UpdatePackages()
         {
@@ -222,8 +398,8 @@ namespace UnityLauncherProTools
         static void Checkbox(string label, ref bool value)
         {
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button(label, EditorStyles.label)) value = !value;
-            value = EditorGUILayout.Toggle("", value);
+            //if (GUILayout.Button(label, EditorStyles.label)) value = !value;
+            value = EditorGUILayout.ToggleLeft(label, value);
             EditorGUILayout.EndHorizontal();
         }
 
