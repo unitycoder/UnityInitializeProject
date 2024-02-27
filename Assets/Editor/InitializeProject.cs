@@ -186,7 +186,7 @@ namespace UnityLauncherProTools
             // TODO 2d/3d mode for editor?
 
             UpdatePackages();
-
+            AssetDatabase.Refresh();
             SaveSettings(import: true);
 
             // skybox off from lighting settings
@@ -307,7 +307,7 @@ namespace UnityLauncherProTools
                             Debug.LogError("File not found: " + items[i]);
                             continue;
                         }
-                        Debug.Log("Importing: " + items[i]);
+                        Debug.Log("Importing: " + Path.GetFileName(items[i]));
                         AssetDatabase.ImportPackage(items[i], false);
                     }
                 }
@@ -365,7 +365,6 @@ namespace UnityLauncherProTools
                 // add wanted packages, if missing
                 foreach (KeyValuePair<string, string> item in addPackages)
                 {
-                    // TODO check if want to increase version number?
                     if (fromJson.dependencies.ContainsKey(item.Key) == false)
                     {
                         fromJson.dependencies.Add(item.Key, item.Value);
@@ -373,7 +372,12 @@ namespace UnityLauncherProTools
                     }
                     else
                     {
-                        //Debug.Log("Already contains " + item.Key);
+                        // upgrade version if newer from script
+                        if (fromJson.dependencies[item.Key] != item.Value)
+                        {
+                            Debug.Log("Updated " + item.Key + " from " + fromJson.dependencies[item.Key] + " to " + item.Value);
+                            fromJson.dependencies[item.Key] = item.Value;
+                        }
                     }
                 }
 
