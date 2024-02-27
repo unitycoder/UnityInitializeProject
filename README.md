@@ -11,16 +11,17 @@ When starting a new project, you always have to do the same things over and over
 
 ### Current Features
 
-- Create common folders (like Scenes, Materials, Scripts..)
+- Create common folders (like Scenes, Materials, Prefabs, Scripts..)
 - Colorspace to linear
 - Save Main scene
 - Add scene to build settings
-- Set main camera to 0,0,0
+- Set main camera to 0,3,-10
 - Disable sceneview camera Easing & Acceleration
 - Set 3D gizmos size smaller
 - Disable splash screen
 - Set company name, product name (TODO need to assign these somewhere..)
 - Remove unwanted packages
 - Add wanted packages
+- NEW: Import your favourite asset store packages (.unitypackage)
 
 *This example script is designed for my own workflows, but you can edit it and use inside Unity or through UnityLauncherPro (when creating new project there).
