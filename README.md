@@ -25,3 +25,6 @@ When starting a new project, you always have to do the same things over and over
 - NEW: Import your favourite asset store packages (.unitypackage)
 
 *This example script is designed for my own workflows, but you can edit it and use inside Unity or through UnityLauncherPro (when creating new project there).
+
+### Links
+- Unity forum thread https://forum.unity.com/threads/github-automatic-project-initialization-editor-script.1352966/
