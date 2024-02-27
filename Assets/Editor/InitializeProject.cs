@@ -15,7 +15,7 @@ namespace UnityLauncherProTools
         static readonly string id = "InitializeProject_";
 
         // settings
-        static string[] folders = new string[] { "Fonts", "Materials", "Models", "Plugins", "Prefabs", "Scenes", "Scripts", "Shaders", "Sounds", "Textures" };
+        static string[] folders = new string[] { "Fonts", "Materials", "Models", "Prefabs", "Scenes", "Scripts", "Shaders", "Sounds", "Textures" };
 
         static Dictionary<string, string> addPackages = new Dictionary<string, string>() { { "com.unity.ide.visualstudio", "2.0.22" } };
         static string[] blackListedPackages = new string[] { "com.unity.modules.unityanalytics", "com.unity.modules.director", "com.unity.collab-proxy", "com.unity.ide.rider", "com.unity.ide.vscode", "com.unity.test-framework", "com.unity.timeline", "com.unity.visualscripting" };
@@ -187,7 +187,7 @@ namespace UnityLauncherProTools
 
             UpdatePackages();
             AssetDatabase.Refresh();
-            SaveSettings(import: true);
+            SaveSettingsAndImportAssets(import: true);
 
             // skybox off from lighting settings
             RenderSettings.skybox = null;
@@ -197,7 +197,7 @@ namespace UnityLauncherProTools
             // TODO set background color?
 
             // reset camera pos
-            Camera.main.transform.position = Vector3.zero;
+            Camera.main.transform.position = new Vector3(0, 3, -10);
 
             // disable editor camera easing and acceleration
 #if UNITY_2019_1_OR_NEWER
@@ -231,8 +231,9 @@ namespace UnityLauncherProTools
             // self destruct this editor script file
             if (deleteFile == true)
             {
-                // FIXME in editor: file is deleted, if re-import some script, while editorwindow is open (resets deletefile var?)
+                // FIXME in editor: file is deleted, if re-import some script, while editorwindow is open (resets deletefile bool?)
                 var scriptPath = Path.Combine(assetsFolder, "Editor/InitializeProject.cs");
+
                 Debug.Log("Deleting init script: " + scriptPath);
                 if (File.Exists(scriptPath)) File.Delete(scriptPath);
                 if (File.Exists(scriptPath + ".meta")) File.Delete(scriptPath + ".meta");
@@ -241,9 +242,8 @@ namespace UnityLauncherProTools
             {
                 Debug.Log("File not deleted when called init manually");
             }
-
-            // refresh folder
             AssetDatabase.Refresh();
+            // if imported assets, need to enter playmode and off for some reason..
         }
 
         private void OnEnable()
@@ -253,12 +253,54 @@ namespace UnityLauncherProTools
 
         private void OnDestroy()
         {
-            SaveSettings();
+            SaveSettingsAndImportAssets();
+            if (importAssets == true)
+            {
+                // have to enter playmode to fully import asset packages???
+                EditorApplication.EnterPlaymode();
+
+                var stopperScript = Path.Combine(assetsFolder, "Editor/StopPlaymode.cs");
+                string contents = @"
+using UnityEditor;
+using UnityEngine;
+using System.IO;
+using UnityEditor.Callbacks;
+
+[InitializeOnLoad]
+public class StopPlaymode
+{
+    static StopPlaymode()
+    {
+        EditorApplication.ExitPlaymode();
+        EditorApplication.delayCall += DeleteSelfScript;
+    }
+
+    static void DeleteSelfScript()
+    {
+        var scriptPath = Path.Combine(Application.dataPath, ""Editor/StopPlaymode.cs"");
+        if (File.Exists(scriptPath))
+        {
+            File.Delete(scriptPath);
+            File.Delete(scriptPath + "".meta"");
+            AssetDatabase.Refresh();
+        }
+    }
+}";
+                File.WriteAllText(stopperScript, contents);
+            }
+
+            //// create dummy editor script to stop playmode and delete itself
+            //if (File.Exists(stopperScript) == false)
+            //{
+            //    string contents = "using UnityEditor;\n\n[InitializeOnLoad]\npublic class StopPlaymode\n{\n static StopPlaymode()\n {\n EditorApplication.ExitPlaymode();\n System.IO.File.Delete(\"" + stopperScript + "\");}\n}";
+            //    File.WriteAllText(stopperScript, contents);
+            //}
+
         }
 
         private void OnDisable()
         {
-            SaveSettings();
+            SaveSettingsAndImportAssets();
         }
 
         private static void LoadSettings()
@@ -292,7 +334,7 @@ namespace UnityLauncherProTools
             }
         }
 
-        static void SaveSettings(bool import = false)
+        static void SaveSettingsAndImportAssets(bool import = false)
         {
             string listOfAssets = "";
             string checkedState = "";
@@ -420,7 +462,7 @@ namespace UnityLauncherProTools
         }
     }
 
-    // manifest.json
+    #region JSON_HANDLING
     public class DependenciesManifest
     {
         public Dictionary<string, string> dependencies { get; set; }
@@ -466,4 +508,5 @@ namespace UnityLauncherProTools
             return (T)deserializeMethod.Invoke(null, new object[] { json, typeof(T) });
         }
     }
+    #endregion
 }
