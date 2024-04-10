@@ -28,3 +28,7 @@ When starting a new project, you always have to do the same things over and over
 
 ### Links
 - Unity forum thread https://forum.unity.com/threads/github-automatic-project-initialization-editor-script.1352966/
+
+### Videos
+- Compare manual setup vs automatic setup: (youtube link)<br>
+[![youtube](https://img.youtube.com/vi/NAG8BnsUTSY/0.jpg)](https://www.youtube.com/watch?v=NAG8BnsUTSY)
