@@ -54,9 +54,9 @@ namespace UnityLauncherProTools
             GUILayout.Label("Project Setup", EditorStyles.boldLabel);
             GUILayout.Space(10);
 
-            Checkbox("Create Folders", ref createFolders);
-            Checkbox("Update Packages", ref updatePackages);
-            Checkbox("Import Assets", ref importAssets);
+            Checkbox("Create Folders", "Common folders: Scripts, Scenes, Textures..", ref createFolders);
+            Checkbox("Update Packages", "Adds and removes packages from manifest.json", ref updatePackages);
+            Checkbox("Import Assets", "Imports selected assets from the list below", ref importAssets);
 
             GUILayout.Space(10);
             if (GUILayout.Button("Setup Project", GUILayout.Height(64)))
@@ -185,7 +185,7 @@ namespace UnityLauncherProTools
 
             // TODO 2d/3d mode for editor?
 
-            UpdatePackages();
+            if (updatePackages == true) UpdatePackages();
             AssetDatabase.Refresh();
             SaveSettingsAndImportAssets(import: true);
 
@@ -256,7 +256,7 @@ namespace UnityLauncherProTools
             SaveSettingsAndImportAssets();
             if (importAssets == true)
             {
-                // have to enter playmode to fully import asset packages???
+                // NOTE have to enter playmode to fully import asset packages???
                 EditorApplication.EnterPlaymode();
 
                 var stopperScript = Path.Combine(assetsFolder, "Editor/StopPlaymode.cs");
@@ -350,7 +350,7 @@ public class StopPlaymode
                             continue;
                         }
                         Debug.Log("Importing: " + Path.GetFileName(items[i]));
-                        AssetDatabase.ImportPackage(items[i], false);
+                        if (importAssets == true) AssetDatabase.ImportPackage(items[i], false);
                     }
                 }
                 listOfAssets += items[i] + "|";
@@ -441,11 +441,13 @@ public class StopPlaymode
         }
 
         // toggle with clickable label text
-        static void Checkbox(string label, ref bool value)
+        static void Checkbox(string label, string tooltip, ref bool value)
         {
             EditorGUILayout.BeginHorizontal();
             //if (GUILayout.Button(label, EditorStyles.label)) value = !value;
-            value = EditorGUILayout.ToggleLeft(label, value);
+            //value = EditorGUILayout.ToggleLeft(label, value);
+            // show tooltip in toggle
+            value = EditorGUILayout.Toggle(new GUIContent(label, tooltip), value);
             EditorGUILayout.EndHorizontal();
         }
 
