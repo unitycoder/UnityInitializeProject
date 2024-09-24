@@ -201,8 +201,8 @@ namespace UnityLauncherProTools
 
             // disable editor camera easing and acceleration
 #if UNITY_2019_1_OR_NEWER
-            SceneView.lastActiveSceneView.cameraSettings.easingEnabled = false;
-            SceneView.lastActiveSceneView.cameraSettings.accelerationEnabled = false;
+            if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.cameraSettings.easingEnabled = false;
+            if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.cameraSettings.accelerationEnabled = false;
 #endif
 
             // GizmoUtility in 2022.1
