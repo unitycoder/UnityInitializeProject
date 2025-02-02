@@ -205,6 +205,11 @@ namespace UnityLauncherProTools
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.cameraSettings.accelerationEnabled = false;
 #endif
 
+            // paraller imports 2021.2
+#if UNITY_2021_2_OR_NEWER
+            EditorSettings.parallerAssetImporters = true;
+#endif
+
             // GizmoUtility in 2022.1
             //GizmoUtility.SetGizmoEnabled(GizmoType.Move, true);
 
