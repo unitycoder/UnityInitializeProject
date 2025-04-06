@@ -217,9 +217,9 @@ namespace UnityLauncherProTools
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.cameraSettings.accelerationEnabled = false;
 #endif
 
-            // paraller imports 2021.2
+            // paraller imports 2021.2 or later
 #if UNITY_2021_2_OR_NEWER
-            EditorSettings.parallerAssetImporters = true;
+             EnableParallelAssetImport(true);
 #endif
 
             // GizmoUtility in 2022.1
@@ -539,7 +539,32 @@ public class StopPlaymode
                 }
             }
         }
-    }
+
+        public static void EnableParallelAssetImport(bool enabled)
+        {
+            var assembly = typeof(EditorSettings).Assembly;
+            var type = assembly.GetType("UnityEditor.AssetPipelinePreferences");
+
+            if (type != null)
+            {
+                var method = type.GetMethod("SetParallelImport", BindingFlags.Static | BindingFlags.NonPublic);
+                if (method != null)
+                {
+                    method.Invoke(null, new object[] { enabled });
+                    Debug.Log($"Parallel Import {(enabled ? "enabled" : "disabled")} via script.");
+                }
+                else
+                {
+                    Debug.LogWarning("SetParallelImport method not found.");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("AssetPipelinePreferences type not found.");
+            }
+        }
+
+    }  // class InitializeProject
 
     #region JSON_HANDLING
     public class DependenciesManifest
