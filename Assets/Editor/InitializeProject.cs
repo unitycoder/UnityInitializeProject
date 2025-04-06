@@ -1,10 +1,11 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
-using System.Xml;
 using UnityEditor;
+using UnityEditor.PackageManager;
+using UnityEditor.PackageManager.Requests;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
@@ -17,7 +18,7 @@ namespace UnityLauncherProTools
         // settings
         static string[] folders = new string[] { "Fonts", "Materials", "Models", "Prefabs", "Scenes", "Scripts", "Shaders", "Sounds", "Textures" };
 
-        static Dictionary<string, string> addPackages = new Dictionary<string, string>() { { "com.unity.ide.visualstudio", "2.0.22" } };
+        static Dictionary<string, string> addPackages = new Dictionary<string, string>() { { "com.unity.ide.visualstudio", "2.0.23" }, { "com.unity.ugui", null } };
         static string[] blackListedPackages = new string[] { "com.unity.modules.unityanalytics", "com.unity.modules.director", "com.unity.collab-proxy", "com.unity.ide.rider", "com.unity.ide.vscode", "com.unity.test-framework", "com.unity.timeline", "com.unity.visualscripting" };
 
         static InitializeProject window;
@@ -30,6 +31,11 @@ namespace UnityLauncherProTools
         static bool importAssets = true;
         static List<string> items;
         static List<bool> checkedStates;
+
+        static SearchRequest currentSearch;
+        static List<string> packagesToResolve = new List<string>();
+        static int currentPackageIndex = 0;
+        static bool isSearching = false;
 
         [MenuItem("Tools/UnityLibrary/Initialize Project")]
         public static void InitManually()
@@ -45,6 +51,12 @@ namespace UnityLauncherProTools
             window = (InitializeProject)EditorWindow.GetWindow(typeof(InitializeProject));
             window.titleContent = new GUIContent("Initialize Project");
             window.minSize = new Vector2(450, 550);
+
+            // fetch latest package numbers> only scan those with null version
+            packagesToResolve = addPackages.Where(kvp => kvp.Value == null).Select(kvp => kvp.Key).ToList();
+            currentPackageIndex = 0;
+            StartNextPackageVersionSearch();
+
             LoadSettings();
             window.Show();
         }
@@ -380,6 +392,7 @@ public class StopPlaymode
             {
                 jsonConvertType = Assembly.Load("Newtonsoft.Json").GetType("Newtonsoft.Json.JsonConvert");
             }
+
             IJsonSerializer jsonSerializer;
             if (jsonConvertType != null)
             {
@@ -397,6 +410,7 @@ public class StopPlaymode
                 //Debug.Log("We have Newtonsoft.Json");
                 var fromJson = jsonSerializer.Deserialize<DependenciesManifest>(json);
 
+                // remove blacklisted packages
                 for (int i = fromJson.dependencies.Count; i > -1; i--)
                 {
                     for (int k = 0; k < blackListedPackages.Length; k++)
@@ -412,6 +426,13 @@ public class StopPlaymode
                 // add wanted packages, if missing
                 foreach (KeyValuePair<string, string> item in addPackages)
                 {
+                    // skip packages with null or empty version
+                    if (string.IsNullOrEmpty(item.Value))
+                    {
+                        Debug.LogWarning("Skipped adding '" + item.Key + "' because version is null or empty.");
+                        continue;
+                    }
+
                     if (fromJson.dependencies.ContainsKey(item.Key) == false)
                     {
                         fromJson.dependencies.Add(item.Key, item.Value);
@@ -430,6 +451,7 @@ public class StopPlaymode
 
                 // TODO add pretty print
                 var toJson = jsonSerializer.Serialize(fromJson);
+
                 // FIXME temporary pretty print, by adding new lines and tabs
                 toJson = toJson.Replace(",", ",\n");
                 toJson = toJson.Replace("{", "{\n");
@@ -437,12 +459,62 @@ public class StopPlaymode
                 toJson = toJson.Replace("\"dependencies", "\t\"dependencies");
                 toJson = toJson.Replace("\"com.", "\t\t\"com.");
                 //Debug.Log(toJson);
+
                 File.WriteAllText(packagesPath, toJson);
             }
             else
             {
                 Debug.Log("Newtonsoft.Json is not available, cannot remove packages..");
             }
+        } // UpdatePackages()
+
+        static void StartNextPackageVersionSearch()
+        {
+            if (currentPackageIndex >= packagesToResolve.Count)
+            {
+                Debug.Log("Finished resolving all null-version packages.");
+                return;
+            }
+
+            var packageName = packagesToResolve[currentPackageIndex];
+            Debug.Log($"Searching for latest version of {packageName}...");
+            currentSearch = Client.Search(packageName);
+            EditorApplication.update += PackageVersionFetchProgress;
+            isSearching = true;
+        }
+
+        static void PackageVersionFetchProgress()
+        {
+            if (!isSearching || currentSearch == null || !currentSearch.IsCompleted) return;
+
+            var packageName = packagesToResolve[currentPackageIndex];
+
+            if (currentSearch.Status == StatusCode.Success)
+            {
+                var latestVersion = currentSearch.Result
+                    .OrderByDescending(p => p.version) // Might not always be semver-safe
+                    .FirstOrDefault()?.version;
+
+                if (latestVersion != null)
+                {
+                    Debug.Log($"Resolved {packageName} to version {latestVersion}");
+                    addPackages[packageName] = latestVersion;
+                }
+                else
+                {
+                    Debug.LogWarning($"No version found for {packageName}");
+                }
+            }
+            else
+            {
+                Debug.LogError($"Failed to resolve {packageName}: {currentSearch.Error.message}");
+            }
+
+            // Move to next
+            isSearching = false;
+            EditorApplication.update -= PackageVersionFetchProgress;
+            currentPackageIndex++;
+            StartNextPackageVersionSearch();
         }
 
         // toggle with clickable label text
