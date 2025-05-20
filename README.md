@@ -32,3 +32,8 @@ When starting a new project, you always have to do the same things over and over
 ### Videos
 - Compare manual setup vs automatic setup: (youtube link)<br>
 [![youtube](https://img.youtube.com/vi/NAG8BnsUTSY/0.jpg)](https://www.youtube.com/watch?v=NAG8BnsUTSY)
+
+### Images
+
+Just 1 click to setup everything!
+![image](https://github.com/user-attachments/assets/b813f093-d2e8-4440-9dc3-962eae0160bb)
