@@ -35,5 +35,5 @@ When starting a new project, you always have to do the same things over and over
 
 ### Images
 
-Just 1 click to setup everything!
+Just 1 click to setup everything!<br>
 ![image](https://github.com/user-attachments/assets/b813f093-d2e8-4440-9dc3-962eae0160bb)
