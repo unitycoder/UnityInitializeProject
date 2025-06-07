@@ -217,7 +217,7 @@ namespace UnityLauncherProTools
             if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.cameraSettings.accelerationEnabled = false;
 #endif
 
-            // paraller imports 2021.2 or later
+            // paraller imports 2021.2 or later (BUT doesnt seem to work..?)
 #if UNITY_2021_2_OR_NEWER
              EnableParallelAssetImport(true);
 #endif
@@ -274,7 +274,8 @@ namespace UnityLauncherProTools
             if (importAssets == true)
             {
                 // NOTE have to enter playmode to fully import asset packages???
-                EditorApplication.EnterPlaymode();
+#if UNITY_2019_1_OR_NEWER
+                EditorApplication.EnterPlaymode(); // not available in <2019.1
 
                 var stopperScript = Path.Combine(assetsFolder, "Editor/StopPlaymode.cs");
                 string contents = @"
@@ -313,6 +314,7 @@ public class StopPlaymode
             //    File.WriteAllText(stopperScript, contents);
             //}
 
+#endif
         }
 
         private void OnDisable()
@@ -540,6 +542,8 @@ public class StopPlaymode
             }
         }
 
+#if UNITY_2021_2_OR_NEWER
+// NOTE doesnt work?
         public static void EnableParallelAssetImport(bool enabled)
         {
             var assembly = typeof(EditorSettings).Assembly;
@@ -563,6 +567,7 @@ public class StopPlaymode
                 Debug.LogWarning("AssetPipelinePreferences type not found.");
             }
         }
+#endif
 
     }  // class InitializeProject
 
