@@ -18,7 +18,7 @@ namespace UnityLauncherProTools
         // settings
         static string[] folders = new string[] { "Fonts", "Materials", "Models", "Prefabs", "Scenes", "Scripts", "Shaders", "Sounds", "Textures" };
 
-        static Dictionary<string, string> addPackages = new Dictionary<string, string>() { { "com.unity.ide.visualstudio", "2.0.25" }, { "com.unity.ugui", "latest" } };
+        static Dictionary<string, string> addPackages = new Dictionary<string, string>() { { "com.unity.ide.visualstudio", "2.0.25" }, { "com.unity.ugui", null } };
         static string[] blackListedPackages = new string[] { "com.unity.modules.unityanalytics", "com.unity.modules.director", "com.unity.collab-proxy", "com.unity.ide.rider", "com.unity.ide.vscode", "com.unity.test-framework", "com.unity.timeline", "com.unity.visualscripting" };
 
         static InitializeProject window;
@@ -426,30 +426,39 @@ public class StopPlaymode
                 }
 
                 // add wanted packages, if missing
+                // add wanted packages, if missing
                 foreach (KeyValuePair<string, string> item in addPackages)
                 {
-                    // skip packages with null or empty version
-                    if (string.IsNullOrEmpty(item.Value))
+                    var packageName = item.Key;
+                    var version = item.Value;
+
+                    // If version is still null/empty here, we treat it as "install latest via PackageManager"
+                    if (string.IsNullOrEmpty(version))
                     {
-                        Debug.LogWarning("Skipped adding '" + item.Key + "' because version is null or empty.");
+#if UNITY_2019_1_OR_NEWER
+                        Debug.Log($"Version for '{packageName}' not resolved yet, installing latest via PackageManager.Client.Add");
+                        Client.Add(packageName); // no @version = latest compatible
+#else
+        Debug.Log($"Skipping '{packageName}': no version and Package Manager API not available on this Unity version.");
+#endif
                         continue;
                     }
 
-                    if (fromJson.dependencies.ContainsKey(item.Key) == false)
+                    if (fromJson.dependencies.ContainsKey(packageName) == false)
                     {
-                        fromJson.dependencies.Add(item.Key, item.Value);
-                        Debug.Log("Added " + item.Key);
+                        fromJson.dependencies.Add(packageName, version);
+                        Debug.Log("Added " + packageName + "@" + version);
                     }
                     else
                     {
-                        // upgrade version if newer from script
-                        if (fromJson.dependencies[item.Key] != item.Value)
+                        if (fromJson.dependencies[packageName] != version)
                         {
-                            Debug.Log("Updated " + item.Key + " from " + fromJson.dependencies[item.Key] + " to " + item.Value);
-                            fromJson.dependencies[item.Key] = item.Value;
+                            Debug.Log("Updated " + packageName + " from " + fromJson.dependencies[packageName] + " to " + version);
+                            fromJson.dependencies[packageName] = version;
                         }
                     }
                 }
+
 
                 // TODO add pretty print
                 var toJson = jsonSerializer.Serialize(fromJson);
@@ -494,13 +503,13 @@ public class StopPlaymode
             if (currentSearch.Status == StatusCode.Success)
             {
                 var latestVersion = currentSearch.Result
-                    .OrderByDescending(p => p.version) // Might not always be semver-safe
+                    .OrderByDescending(p => p.version)
                     .FirstOrDefault()?.version;
 
                 if (latestVersion != null)
                 {
                     Debug.Log($"Resolved {packageName} to version {latestVersion}");
-                    addPackages[packageName] = latestVersion;
+                    addPackages[packageName] = latestVersion; // <--- important
                 }
                 else
                 {
@@ -512,12 +521,12 @@ public class StopPlaymode
                 Debug.LogError($"Failed to resolve {packageName}: {currentSearch.Error.message}");
             }
 
-            // Move to next
             isSearching = false;
             EditorApplication.update -= PackageVersionFetchProgress;
             currentPackageIndex++;
             StartNextPackageVersionSearch();
         }
+
 
         // toggle with clickable label text
         static void Checkbox(string label, string tooltip, ref bool value)
