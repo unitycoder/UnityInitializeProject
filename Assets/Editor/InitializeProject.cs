@@ -16,10 +16,10 @@ namespace UnityLauncherProTools
         static readonly string id = "InitializeProject_";
 
         // settings
-        static string[] folders = new string[] { "Fonts", "Materials", "Models", "Prefabs", "Scenes", "Scripts", "Shaders", "Sounds", "Textures" };
+        static string[] folders = new string[] { "Fonts", "Materials", "Models", "Prefabs", "Scenes", "Scripts", "Shaders", "Settings", "Sounds", "Textures" };
 
         static Dictionary<string, string> addPackages = new Dictionary<string, string>() { { "com.unity.ide.visualstudio", "2.0.27" }, { "com.unity.ugui", null } };
-        static string[] blackListedPackages = new string[] { "com.unity.modules.unityanalytics", "com.unity.modules.director", "com.unity.collab-proxy", "com.unity.ide.rider", "com.unity.ide.vscode", "com.unity.test-framework", "com.unity.timeline", "com.unity.visualscripting" };
+        static string[] blackListedPackages = new string[] { "com.unity.modules.unityanalytics", "com.unity.modules.director", "com.unity.collab-proxy", "com.unity.ide.rider", "com.unity.ide.vscode", "com.unity.test-framework", "com.unity.timeline", "com.unity.visualscripting", "com.unity.multiplayer.center" };
 
         static InitializeProject window;
         static string assetsFolder;
@@ -28,7 +28,8 @@ namespace UnityLauncherProTools
         static bool createFolders = true;
         static bool updatePackages = true;
 
-        static bool importAssets = true;
+        static bool importAssets = false;
+        static bool importGITPackages = false;
         static List<string> items;
         static List<bool> checkedStates;
 
@@ -36,6 +37,7 @@ namespace UnityLauncherProTools
         static List<string> packagesToResolve = new List<string>();
         static int currentPackageIndex = 0;
         static bool isSearching = false;
+        static string gitPackagesList = string.Empty;
 
         [MenuItem("Tools/UnityLibrary/Initialize Project")]
         public static void InitManually()
@@ -50,7 +52,7 @@ namespace UnityLauncherProTools
         {
             window = (InitializeProject)EditorWindow.GetWindow(typeof(InitializeProject));
             window.titleContent = new GUIContent("Initialize Project");
-            window.minSize = new Vector2(450, 550);
+            window.minSize = new Vector2(450, 558);
 
             // fetch latest package numbers> only scan those with null version
             packagesToResolve = addPackages.Where(kvp => kvp.Value == null).Select(kvp => kvp.Key).ToList();
@@ -69,6 +71,7 @@ namespace UnityLauncherProTools
             Checkbox("Create Folders", "Common folders: Scripts, Scenes, Textures..", ref createFolders);
             Checkbox("Update Packages", "Adds and removes packages from manifest.json", ref updatePackages);
             Checkbox("Import Assets", "Imports selected assets from the list below", ref importAssets);
+            Checkbox("Import GIT Packages", "Imports given git package urls from list below", ref importGITPackages);
 
             GUILayout.Space(10);
             if (GUILayout.Button("Setup Project", GUILayout.Height(64)))
@@ -76,11 +79,30 @@ namespace UnityLauncherProTools
                 SetupProject();
             }
 
-            DrawAddAssets();
+            DrawSelectAssets();
             DrawAssetList();
 
-            // enter to confirm
-            if (Event.current.keyCode == KeyCode.Return) SetupProject();
+            GUILayout.Space(5);
+            GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(2));
+            GUILayout.Space(5);
+
+            // textarea
+            GUILayout.Label("UPM Git Packages (1 per line, use #6000.3 for minimum version)");
+            gitPackagesList = EditorGUILayout.TextArea(gitPackagesList, GUILayout.Height(64));
+
+            // enter to confirm, except when typing in textarea
+            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() != "TextArea")
+            {
+                SetupProject();
+            }
+
+            // if mouse click anywhere on window
+            var theWholeWindowRect = new Rect(0, 0, position.width, position.height);
+            if (GUI.Button(theWholeWindowRect, "", GUIStyle.none))
+            {
+                GUI.FocusControl(null);
+            }
+
         }
 
         static void DrawAssetList()
@@ -136,7 +158,7 @@ namespace UnityLauncherProTools
             }
         }
 
-        private static void DrawAddAssets()
+        private static void DrawSelectAssets()
         {
             GUILayout.Space(10);
             GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(2));
@@ -219,7 +241,7 @@ namespace UnityLauncherProTools
 
             // paraller imports 2021.2 or later (BUT doesnt seem to work..?)
 #if UNITY_2021_2_OR_NEWER
-             EnableParallelAssetImport(true);
+            EnableParallelAssetImport(true);
 #endif
 
             // GizmoUtility in 2022.1
@@ -259,6 +281,60 @@ namespace UnityLauncherProTools
             {
                 Debug.Log("File not deleted when called init manually");
             }
+
+            if (importGITPackages == true && string.IsNullOrEmpty(gitPackagesList) == false)
+            {
+                var gitUrls = gitPackagesList.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                var gitPackagesToInstall = new List<string>();
+                foreach (var url in gitUrls)
+                {
+                    var trimmerURL = url.Trim();
+                    // skip empty, comment rows and invalid urls
+                    if (string.IsNullOrEmpty(trimmerURL) == false && trimmerURL.IndexOf("#") != 0 && trimmerURL.IndexOf("http") == 0)
+                    {
+                        // remove trailing # if any
+                        var hashIndex = trimmerURL.IndexOf("#");
+                        if (hashIndex > -1)
+                        {
+                            // compare hash with editor version, has is like "#6000.3", and if version is lower, then dont add package, and log warning
+                            var versionPart = trimmerURL.Substring(hashIndex + 1);
+                            var versionNumbers = versionPart.Split('.');
+
+                            var editorVersion = Application.unityVersion;
+                            var editorVersionParts = editorVersion.Split('.');
+
+                            if (versionNumbers.Length > 1 && editorVersionParts.Length > 1)
+                            {
+                                if (int.TryParse(versionNumbers[0], out int requiredMajor) && int.TryParse(editorVersionParts[0], out int editorMajor))
+                                {
+                                    if (editorMajor < requiredMajor)
+                                    {
+                                        Debug.LogWarning($"Skipping {trimmerURL} because it requires Unity {versionPart} or higher, but current version is {editorVersion}");
+                                        continue;
+                                    }
+
+                                    if (int.TryParse(versionNumbers[1], out int requiredMinor) && int.TryParse(editorVersionParts[1], out int editorMinor))
+                                    {
+                                        if (editorMinor < requiredMinor)
+                                        {
+                                            Debug.LogWarning($"Skipping {trimmerURL} because it requires Unity {versionPart} or higher, but current version is {editorVersion}");
+                                            continue;
+                                        }
+                                    }
+                                }
+                            }
+
+                            trimmerURL = trimmerURL.Substring(0, hashIndex);
+                        }
+
+                        gitPackagesToInstall.Add(trimmerURL);
+                        Debug.Log($"Queued {trimmerURL} for installation");
+                    }
+                }
+                //BatchGitInstaller.InstallAll(gitPackagesToInstall);
+
+            }
+
             AssetDatabase.Refresh();
             // if imported assets, need to enter playmode and off for some reason..
         }
@@ -315,7 +391,7 @@ public class StopPlaymode
             //}
 
 #endif
-        }
+        } // OnDestroy()
 
         private void OnDisable()
         {
@@ -328,6 +404,7 @@ public class StopPlaymode
             checkedStates = new List<bool>();
 
             importAssets = EditorPrefs.GetBool(id + "importAssets", true);
+            gitPackagesList = EditorPrefs.GetString(id + "gitPackagesList", "");
             var listOfAssets = EditorPrefs.GetString(id + "listOfAssets", "");
             var checkedState = EditorPrefs.GetString(id + "checkedState", "");
 
@@ -378,6 +455,7 @@ public class StopPlaymode
             EditorPrefs.SetString(id + "listOfAssets", listOfAssets);
             EditorPrefs.SetString(id + "checkedState", checkedState);
             EditorPrefs.SetBool(id + "importAssets", importAssets);
+            EditorPrefs.SetString(id + "gitPackagesList", gitPackagesList);
         }
 
         static void UpdatePackages()
@@ -552,7 +630,7 @@ public class StopPlaymode
         }
 
 #if UNITY_2021_2_OR_NEWER
-// NOTE doesnt work?
+        // NOTE doesnt work?
         public static void EnableParallelAssetImport(bool enabled)
         {
             var assembly = typeof(EditorSettings).Assembly;
@@ -627,4 +705,77 @@ public class StopPlaymode
         }
     }
     #endregion
-}
+
+    public static class GitPackageInstaller
+    {
+        public static void Install(string gitUrl, Action<bool, string> onComplete = null)
+        {
+            var request = Client.Add(gitUrl);
+
+            void Update()
+            {
+                if (!request.IsCompleted) return;
+
+                EditorApplication.update -= Update;
+
+                if (request.Status == StatusCode.Success)
+                {
+                    var packageInfo = request.Result;
+                    var msg = $"Installed '{packageInfo.name}' v{packageInfo.version}";
+                    Debug.Log($"[GitPackageInstaller] {msg}");
+                    onComplete?.Invoke(true, msg);
+                }
+                else
+                {
+                    var err = request.Error != null
+                        ? $"{request.Error.errorCode}: {request.Error.message}"
+                        : "Unknown error";
+                    Debug.LogError($"[GitPackageInstaller] Failed to install '{gitUrl}': {err}");
+                    onComplete?.Invoke(false, err);
+                }
+            }
+
+            EditorApplication.update += Update;
+        }
+    } // GitPackageInstaller
+
+    public static class BatchGitInstaller
+    {
+        public static void InstallAll(List<string> gitPackages)
+        {
+            var remaining = new Queue<string>(gitPackages);
+            var results = new List<(string name, bool success, string msg)>();
+            int total = gitPackages.Count;
+
+            void InstallNext()
+            {
+                if (remaining.Count == 0)
+                {
+                    Debug.Log($"[BatchGitInstaller] All done. " +
+                        $"{results.Count(r => r.success)}/{total} succeeded.");
+                    return;
+                }
+
+                var url = remaining.Dequeue();
+                float progress = 1f - (float)remaining.Count / total;
+                EditorUtility.DisplayProgressBar("Installing Packages",
+                    $"Installing {url}...", progress);
+
+                GitPackageInstaller.Install(url, (success, msg) =>
+                {
+                    results.Add((url, success, msg));
+
+                    if (remaining.Count == 0)
+                    {
+                        EditorUtility.ClearProgressBar();
+                    }
+
+                    InstallNext();
+                });
+            }
+
+            InstallNext();
+        }
+    }
+
+} // namespace
