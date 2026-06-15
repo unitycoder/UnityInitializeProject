@@ -282,6 +282,8 @@ namespace UnityLauncherProTools
                 Debug.Log("File not deleted when called init manually");
             }
 
+            AssetDatabase.Refresh();
+
             if (importGITPackages == true && string.IsNullOrEmpty(gitPackagesList) == false)
             {
                 var gitUrls = gitPackagesList.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -331,11 +333,9 @@ namespace UnityLauncherProTools
                         Debug.Log($"Queued {trimmerURL} for installation");
                     }
                 }
-                //BatchGitInstaller.InstallAll(gitPackagesToInstall);
+                BatchGitInstaller.InstallAll(gitPackagesToInstall);
+            } // if import git packages
 
-            }
-
-            AssetDatabase.Refresh();
             // if imported assets, need to enter playmode and off for some reason..
         }
 
@@ -491,15 +491,11 @@ public class StopPlaymode
                 var fromJson = jsonSerializer.Deserialize<DependenciesManifest>(json);
 
                 // remove blacklisted packages
-                for (int i = fromJson.dependencies.Count; i > -1; i--)
+                foreach (var packageName in blackListedPackages)
                 {
-                    for (int k = 0; k < blackListedPackages.Length; k++)
+                    if (fromJson.dependencies.Remove(packageName))
                     {
-                        if (fromJson.dependencies.ContainsKey(blackListedPackages[k]))
-                        {
-                            fromJson.dependencies.Remove(blackListedPackages[k]);
-                            //Debug.Log("Removed " + blackListedPackages[k]);
-                        }
+                        Debug.Log("Removed " + packageName);
                     }
                 }
 
