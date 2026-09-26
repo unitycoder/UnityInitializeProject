@@ -29,6 +29,7 @@ namespace UnityLauncherProTools
         static bool updatePackages = true;
 
         static bool importAssets = false;
+        static bool addEssentials = false;
         //static bool importGITPackages = false;
         static List<string> items;
         static List<bool> checkedStates;
@@ -38,6 +39,8 @@ namespace UnityLauncherProTools
         static int currentPackageIndex = 0;
         static bool isSearching = false;
         //static string gitPackagesList = string.Empty;
+
+        private static AddRequest addRequest;
 
         [MenuItem("Tools/UnityLibrary/Initialize Project")]
         public static void InitManually()
@@ -71,6 +74,9 @@ namespace UnityLauncherProTools
             Checkbox("Create Folders", "Common folders: Scripts, Scenes, Textures..", ref createFolders);
             Checkbox("Update Packages", "Adds and removes packages from manifest.json", ref updatePackages);
             Checkbox("Import Assets", "Imports selected assets from the list below", ref importAssets);
+#if UNITY_6000_3_OR_NEWER
+            Checkbox("Add Essentials Package", "https://github.com/unitycoder/UnityEditorEssentials.git", ref addEssentials);
+#endif
             //Checkbox("Import GIT Packages", "Imports given git package urls from list below", ref importGITPackages);
 
             GUILayout.Space(10);
@@ -404,6 +410,7 @@ public class StopPlaymode
             checkedStates = new List<bool>();
 
             importAssets = EditorPrefs.GetBool(id + "importAssets", true);
+            addEssentials = EditorPrefs.GetBool(id + "addEssentials", false);
             //gitPackagesList = EditorPrefs.GetString(id + "gitPackagesList", "");
             var listOfAssets = EditorPrefs.GetString(id + "listOfAssets", "");
             var checkedState = EditorPrefs.GetString(id + "checkedState", "");
@@ -456,7 +463,22 @@ public class StopPlaymode
             EditorPrefs.SetString(id + "listOfAssets", listOfAssets);
             EditorPrefs.SetString(id + "checkedState", checkedState);
             EditorPrefs.SetBool(id + "importAssets", importAssets);
+            EditorPrefs.SetBool(id + "addEssentials", addEssentials);
+
+            AddCustomGitPackages();
+
             //EditorPrefs.SetString(id + "gitPackagesList", gitPackagesList);
+        }
+
+        private static void AddCustomGitPackages()
+        {
+#if UNITY_6000_3_OR_NEWER
+            if (addEssentials == true)
+            {
+                var essentialsUrl = "https://github.com/unitycoder/UnityEditorEssentials.git";
+                addRequest = Client.Add(essentialsUrl);
+            }
+#endif
         }
 
         static void UpdatePackages()
